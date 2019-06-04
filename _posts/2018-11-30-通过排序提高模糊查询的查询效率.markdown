@@ -1,0 +1,10 @@
+
+sql是Hibernate框架生成的。
+
+select top 20 tphamoutho0_.requId as col_0_0_ from t_pham_outhouse_rec tphamoutho0_ left outer join t_pham_drugs tphamdrugs1_ on tphamoutho0_.drugNO=tphamdrugs1_.drugNO left outer join t_pham_base_drugType tphambased2_ on tphamdrugs1_.drugType=tphambased2_.rid left outer join t_pham_outhouse tphamoutho3_ on tphamoutho0_.outhsId=tphamoutho3_.outhsId left outer join t_pham_base_location tphambasel4_ on tphamoutho3_.storeroom=tphambasel4_.localId where tphambasel4_.orgId='1145' and (tphamdrugs1_.drugName like '%丸%') order by tphamoutho3_.outDate DESC,tphamdrugs1_.drugName
+
+sqlserver数据库，drugName列是建过索引的。对表t_pham_drugs的drugName字段进行模糊查询，在加入",tphamdrugs1_.drugName" 这个排序前，需要几分钟查询出结果，多查几次也要几十秒，加入排序后查询时间变为不到1秒。
+
+在网上我没有找到关于这个现象的资料，但是问题解决了。
+
+### 结论：sqlserver数据库，模糊查询慢的时候可以尝试对模糊查询的字段进行排序。

@@ -1,0 +1,109 @@
+
+nginx可以限制一个IP指定时间段的请求次数
+
+https://blog.csdn.net/xj626852095/article/details/51155875
+```
+http{
+    ...
+
+    #定义一个名为allips的limit_req_zone用来存储session，大小是10M内存，
+    #以$binary_remote_addr 为key,限制平均每秒的请求为20个，
+    #1M能存储16000个状态，rete的值必须为整数，
+    #如果限制两秒钟一个请求，可以设置成30r/m
+
+    limit_req_zone $binary_remote_addr zone=allips:10m rate=20r/s;
+    ...
+    server{
+        ...
+        location {
+            ...
+
+            #限制每ip每秒不超过20个请求，漏桶数burst为5
+            #brust的意思就是，如果第1秒、2,3,4秒请求为19个，
+            #第5秒的请求为25个是被允许的。
+            #但是如果你第1秒就25个请求，第2秒超过20的请求返回503错误。
+            #nodelay，如果不设置该选项，严格使用平均速率限制请求数，
+            #第1秒25个请求时，5个请求放到第2秒执行，
+            #设置nodelay，25个请求将在第1秒执行。
+
+            limit_req zone=allips burst=5 nodelay;
+            ...
+        }
+        ...
+    }
+    ...
+}
+```
+
+网上找到的只有这个配置，这个只能限制一个IP的请求速度，不能分辨重复请求，说明中#以$binary_remote_addr 为key,限制平均每秒的请求为20个，那是不是可以用其它变量为key可以满足这个需求呢？于是找到下面这篇文章。
+
+https://blog.csdn.net/qwed070/article/details/74994085
+
+- arg_PARAMETER #这个变量包含GET请求中，如果有变量PARAMETER时的值。 
+- args #这个变量等于请求行中(GET请求)的参数，如：foo=123&bar=blahblah; 
+- binary_remote_addr #二进制的客户地址。 
+- body_bytes_sent #响应时送出的body字节数数量。即使连接中断，这个数据也是精确的。 
+- content_length #请求头中的Content-length字段。 
+- content_type #请求头中的Content-Type字段。 
+- cookie_COOKIE #cookie COOKIE变量的值 
+- document_root #当前请求在root指令中指定的值。 
+- document_uri #与uri相同。 
+- host #请求主机头字段，否则为服务器名称。 
+- hostname #Set to themachine’s hostname as returned by gethostname 
+- http_HEADER 
+- is_args #如果有args参数，这个变量等于”?”，否则等于””，空值。 
+- http_user_agent #客户端agent信息 
+- http_cookie #客户端cookie信息 
+- limit_rate #这个变量可以限制连接速率。 
+- query_string #与args相同。 
+- request_body_file #客户端请求主体信息的临时文件名。 
+- request_method #客户端请求的动作，通常为GET或POST。 
+- remote_addr #客户端的IP地址。 
+- remote_port #客户端的端口。 
+- remote_user #已经经过Auth Basic Module验证的用户名。 
+- request_completion #如果请求结束，设置为OK. 当请求未结束或如果该请求不是请求链串的最后一个时，为空(Empty)。 
+- request_method #GET或POST 
+- request_filename #当前请求的文件路径，由root或alias指令与URI请求生成。 
+- request_uri #包含请求参数的原始URI，不包含主机名，如：”/foo/bar.php?arg=baz”。不能修改。 
+- scheme #HTTP方法（如http，https）。 
+- server_protocol #请求使用的协议，通常是HTTP/1.0或HTTP/1.1。 
+- server_addr #服务器地址，在完成一次系统调用后可以确定这个值。 
+- server_name #服务器名称。 
+- server_port #请求到达服务器的端口号。
+
+怎么把IP和uri的key拼接起来呢，我以为要加双引号把两个变量包起来，结果发现不行，以为这个方法不行，就去找其它方法，结果没找到。后来又回到这里，试了一下直接把两个变量写在一起，没想到生效了。
+
+### 最终配置：
+```
+http{
+    ...
+
+    #定义一个名为allips的limit_req_zone用来存储session，大小是10M内存，
+    #以$binary_remote_addr 为key,限制平均每秒的请求为20个，
+    #1M能存储16000个状态，rete的值必须为整数，
+    #如果限制两秒钟一个请求，可以设置成30r/m
+
+    limit_req_zone $binary_remote_addr$request_uri zone=allips:10m rate=20r/s;
+    ...
+    server{
+        ...
+        location {
+            ...
+
+            #限制每ip每秒不超过20个请求，漏桶数burst为5
+            #brust的意思就是，如果第1秒、2,3,4秒请求为19个，
+            #第5秒的请求为25个是被允许的。
+            #但是如果你第1秒就25个请求，第2秒超过20的请求返回503错误。
+            #nodelay，如果不设置该选项，严格使用平均速率限制请求数，
+            #第1秒25个请求时，5个请求放到第2秒执行，
+            #设置nodelay，25个请求将在第1秒执行。
+
+            limit_req zone=allips burst=5 nodelay;
+            ...
+        }
+        ...
+    }
+    ...
+}
+```
+ 

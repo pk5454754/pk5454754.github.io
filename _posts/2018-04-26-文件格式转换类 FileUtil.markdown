@@ -1,0 +1,201 @@
+```java
+import java.io.BufferedInputStream;
+
+import java.io.ByteArrayInputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.HttpURLConnection;
+import java.net.MalformedURLException;
+import java.net.ProtocolException;
+import java.net.URL;
+import java.sql.Blob;
+import java.sql.SQLException;
+
+
+import org.apache.commons.fileupload.FileUploadException;
+import org.hibernate.Hibernate;
+
+
+import sun.misc.BASE64Decoder;
+import sun.misc.BASE64Encoder;
+
+
+/**
+ * @author ks
+ * @date 2017-08-30
+ * 文件格式转换类
+ */
+public class FileUtil {
+	/**
+	 * 将文件转成base64 字符串
+	 *
+	 * @param path文件路径
+	 * @return *
+	 * @throws Exception
+	 */
+	public static String encodeBase64File(String path) throws Exception {
+		File file = new File(path);
+		FileInputStream inputFile = new FileInputStream(file);
+		byte[] buffer = new byte[(int) file.length()];
+		inputFile.read(buffer);
+		inputFile.close();
+		return new BASE64Encoder().encode(buffer);
+	}
+
+
+	/**
+	 * 将base64字符解码保存文件
+	 *
+	 * @param base64Code
+	 * @param targetPath
+	 * @throws Exception
+	 */
+	public static void decoderBase64File(String base64Code, String targetPath) throws Exception {
+		byte[] buffer = new BASE64Decoder().decodeBuffer(base64Code);
+		FileOutputStream out = new FileOutputStream(targetPath);
+		out.write(buffer);
+		out.close();
+	}
+
+
+	/**
+	 * 将base64字符保存文本文件
+	 *
+	 * @param base64Code
+	 * @param targetPath
+	 * @throws Exception
+	 */
+	public static void base64ToFile(String base64Code, String targetPath) throws Exception {
+		byte[] buffer = base64Code.getBytes();
+		FileOutputStream out = new FileOutputStream(targetPath);
+		out.write(buffer);
+		out.close();
+	}
+
+
+	public static Blob dataurlToBlob(String dataurl) {
+		if (dataurl.startsWith("data:image/bmp;base64,")) {
+			dataurl = dataurl.substring("data:image/bmp;base64,".length());
+		}else if (dataurl.startsWith("data:image/png;base64,")) {
+			dataurl = dataurl.substring("data:image/png;base64,".length());
+		}else{
+			return null;
+		}
+		try {
+			byte[] buffer = new BASE64Decoder().decodeBuffer(dataurl);
+			ByteArrayInputStream fr = new ByteArrayInputStream(buffer);
+			Blob image = Hibernate.createBlob(fr);
+			return image;
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		return null;
+	}
+
+	public static byte[] blobToBytes(Blob blob) {  
+		  BufferedInputStream is = null;  
+		  try {  
+		    is = new BufferedInputStream(blob.getBinaryStream());  
+		    byte[] bytes = new byte[(int) blob.length()];  
+		    int len = bytes.length;  
+		    int offset = 0;  
+		    int read = 0;  
+		    while (offset < len && (read = is.read(bytes, offset, len)) >= 0) {  
+		      offset += read;  
+		    }  
+		    return bytes;  
+		  } catch (Exception e) {  
+		    return null;  
+		  } finally {  
+		    if(is!=null){
+		    	try {
+					is.close();
+				} catch (IOException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+		    }
+		  }  
+		}  
+
+	public static void blobToFile(Blob blob,String path){
+		try {
+			FileOutputStream out = new FileOutputStream(path);
+			out.write(blobToBytes(blob));
+			out.close();
+		} catch (FileNotFoundException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
+
+	/**
+	 * 类型转换
+	 * */
+	public static Blob fileToBlob(File file){
+		try{
+			if(file==null){
+				return null;
+			}
+			FileInputStream fr = new FileInputStream(file);
+    		Blob image = Hibernate.createBlob(fr);
+    		return image;
+		}catch(Exception ex){
+			ex.printStackTrace();
+		}
+		return null;
+	}
+
+	public static Blob urlToBlob(String urlStr){
+		//new一个URL对象  
+		try {
+			 URL url = new URL(urlStr);
+	        //打开链接  
+	        HttpURLConnection conn = (HttpURLConnection)url.openConnection();  
+	        //设置请求方式为"GET"  
+	        conn.setRequestMethod("GET");  
+	        //超时响应时间为5秒  
+	        conn.setConnectTimeout(5 * 1000);  
+	        //通过输入流获取图片数据  
+	        InputStream inStream = conn.getInputStream();  
+	        int length=0;
+	        int count=0;//尝试次数
+	        while (length == 0) {  
+	        	length = inStream.available();//这个方法不靠谱，要多试几次
+	        	count++;
+	        	if(count>20){
+	        		return null;
+	        	}
+	        	Thread.sleep(100);
+	        }  
+			Blob image = Hibernate.createBlob(inStream,length);
+			return image;
+		} catch (MalformedURLException e) {
+			e.printStackTrace();
+		} catch (ProtocolException e) {
+			e.printStackTrace();
+		} catch (IOException e) {
+			e.printStackTrace();
+		} catch (InterruptedException e) {
+			e.printStackTrace();
+		}  
+		return null;
+	}
+
+	public static void main(String[] args) {
+		String str="data:image/png;base64,XXXXXX";
+		Blob b=dataurlToBlob(str);
+		String path="d:/a.png";
+		blobToFile(b,path);
+	}
+}
+
+```
